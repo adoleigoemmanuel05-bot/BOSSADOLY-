@@ -1,0 +1,6 @@
+{
+  "name": "BossAdoly Digital Hub",
+  "description": "Digital agency specializing in Meta & TikTok Ads, AI UGC video creation, and high-converting websites including landing pages, opt-in pages, and e-commerce stores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

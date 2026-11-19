@@ -1,0 +1,537 @@
+{
+  "entities": {
+    "CmsSettings": {
+      "title": "CmsSettings",
+      "description": "Global site settings including brand logo URL, hero background appearance, and hidden section IDs.",
+      "type": "object",
+      "properties": {
+        "heroAppearance": {
+          "type": "object",
+          "description": "Hero background tone, overlayOpacity, and brightness."
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "Uploaded or external company logo URL/data URI.",
+          "maxLength": 850000
+        },
+        "hiddenSections": {
+          "type": "array",
+          "description": "List of hidden built-in section identifiers."
+        },
+        "syncedCollections": {
+          "type": "object",
+          "description": "Map tracking which default collections have been explicitly saved to Firestore."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Public visibility flag for storefront reads."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["heroAppearance", "hiddenSections", "syncedCollections", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsTextEntry": {
+      "title": "CmsTextEntry",
+      "description": "Editable text copy, text color hex, CTA label/URL, or image style/slides key-value entry.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[a-zA-Z0-9._-]+$"
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["key", "value", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsSlotImage": {
+      "title": "CmsSlotImage",
+      "description": "Per-slot replaced site image stored individually to stay well below Firestore document size limits.",
+      "type": "object",
+      "properties": {
+        "slotKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[a-zA-Z0-9._-]+$"
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 850000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["slotKey", "imageUrl", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsMediaItem": {
+      "title": "CmsMediaItem",
+      "description": "Uploaded showcase video URL (YouTube/Google Drive) or gallery image.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["video", "image"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 850000
+        },
+        "embedUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "source": {
+          "type": "string",
+          "enum": ["youtube", "gdrive", "gallery"]
+        },
+        "placement": {
+          "type": "string",
+          "enum": ["showcase", "hero", "team"]
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "type", "title", "category", "url", "source", "placement", "visible", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsTeamMember": {
+      "title": "CmsTeamMember",
+      "description": "Team member card displayed on Meet Our Team page.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 2500
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 850000
+        },
+        "imageStyle": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "ctaLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ctaUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sortOrder", "name", "role", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsServiceOffering": {
+      "title": "CmsServiceOffering",
+      "description": "Service offering card displayed on Services and Home pages.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "number": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 3000
+        },
+        "deliverables": {
+          "type": "array"
+        },
+        "modeLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "whatsappIntent": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 850000
+        },
+        "imageStyle": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "ctaLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ctaUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "secondaryCtaLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "secondaryCtaUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "number", "sortOrder", "title", "deliverables", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsPricingTier": {
+      "title": "CmsPricingTier",
+      "description": "Pricing package card displayed on Pricing page.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "tag": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "priceDisplay": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "billingNote": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "features": {
+          "type": "array"
+        },
+        "featured": {
+          "type": "boolean"
+        },
+        "whatsappService": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "ctaLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ctaUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sortOrder", "name", "tag", "priceDisplay", "features", "featured", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsFaqEntry": {
+      "title": "CmsFaqEntry",
+      "description": "FAQ question and answer entry displayed on FAQ page.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "answer": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sortOrder", "question", "answer", "isPublic", "ownerId", "updatedAt"]
+    },
+    "CmsCustomSection": {
+      "title": "CmsCustomSection",
+      "description": "Custom page section added dynamically from Admin Dashboard.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "sortOrder": {
+          "type": "number"
+        },
+        "pageId": {
+          "type": "string",
+          "enum": ["home", "services", "pricing", "about", "team", "faq", "contact"]
+        },
+        "kicker": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "bullets": {
+          "type": "array"
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 850000
+        },
+        "imageStyle": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "ctaLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ctaUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "tone": {
+          "type": "string",
+          "enum": ["white", "light", "accent"]
+        },
+        "isPublic": {
+          "type": "boolean"
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sortOrder", "pageId", "title", "bullets", "tone", "isPublic", "ownerId", "updatedAt"]
+    },
+    "ConnectionCheck": {
+      "title": "ConnectionCheck",
+      "description": "Connectivity verification document for Firestore startup health check.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "maxLength": 32
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/cms_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/CmsSettings" },
+      "description": "Global site settings document (main)."
+    },
+    "/cms_text_entries/{entryId}": {
+      "schema": { "$ref": "#/entities/CmsTextEntry" },
+      "description": "Text overrides, color picks, image styles, and CTA links."
+    },
+    "/cms_slot_images/{slotId}": {
+      "schema": { "$ref": "#/entities/CmsSlotImage" },
+      "description": "Replaced image slots across pages and hero slides."
+    },
+    "/cms_media/{itemId}": {
+      "schema": { "$ref": "#/entities/CmsMediaItem" },
+      "description": "Uploaded videos and gallery showcase images."
+    },
+    "/cms_team/{memberId}": {
+      "schema": { "$ref": "#/entities/CmsTeamMember" },
+      "description": "Team members displayed on Meet Our Team page."
+    },
+    "/cms_services/{serviceId}": {
+      "schema": { "$ref": "#/entities/CmsServiceOffering" },
+      "description": "Service offerings displayed on Services and Home pages."
+    },
+    "/cms_pricing/{tierId}": {
+      "schema": { "$ref": "#/entities/CmsPricingTier" },
+      "description": "Pricing tiers displayed on Pricing page."
+    },
+    "/cms_faqs/{faqId}": {
+      "schema": { "$ref": "#/entities/CmsFaqEntry" },
+      "description": "FAQ items displayed on FAQ page."
+    },
+    "/cms_custom_sections/{sectionId}": {
+      "schema": { "$ref": "#/entities/CmsCustomSection" },
+      "description": "Custom dynamically added sections across pages."
+    },
+    "/test/{docId}": {
+      "schema": { "$ref": "#/entities/ConnectionCheck" },
+      "description": "Startup Firestore connection check path."
+    }
+  }
+}

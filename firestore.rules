@@ -1,0 +1,341 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email_verified == true &&
+        request.auth.token.email == 'adoleigoemmanuel05@gmail.com';
+    }
+
+    function isValidStringArray(arr, maxLen) {
+      return arr is list &&
+        arr.size() <= maxLen &&
+        (arr.size() == 0 || arr[0] is string);
+    }
+
+    function isValidHeroAppearance(obj) {
+      return obj is map &&
+        obj.keys().hasAll(['tone', 'overlayOpacity', 'brightness']) &&
+        obj.keys().hasOnly(['tone', 'overlayOpacity', 'brightness']) &&
+        (obj.tone == 'light' || obj.tone == 'dark') &&
+        obj.overlayOpacity is number && obj.overlayOpacity >= 0 && obj.overlayOpacity <= 95 &&
+        obj.brightness is number && obj.brightness >= 40 && obj.brightness <= 160;
+    }
+
+    function isValidSyncedMap(obj) {
+      return obj is map &&
+        obj.keys().hasOnly(['team', 'services', 'pricing', 'faqs']) &&
+        (!('team' in obj) || obj.team is bool) &&
+        (!('services' in obj) || obj.services is bool) &&
+        (!('pricing' in obj) || obj.pricing is bool) &&
+        (!('faqs' in obj) || obj.faqs is bool);
+    }
+
+    // Entity Validators
+    function isValidCmsSettings(data) {
+      return data.keys().hasAll(['heroAppearance', 'logoUrl', 'hiddenSections', 'syncedCollections', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['heroAppearance', 'logoUrl', 'hiddenSections', 'syncedCollections', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidHeroAppearance(data.heroAppearance) &&
+        data.logoUrl is string && data.logoUrl.size() <= 850000 &&
+        isValidStringArray(data.hiddenSections, 50) &&
+        isValidSyncedMap(data.syncedCollections) &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsTextEntry(data) {
+      return data.keys().hasAll(['key', 'value', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['key', 'value', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.key is string && data.key.size() >= 1 && data.key.size() <= 200 &&
+        data.value is string && data.value.size() <= 20000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsSlotImage(data) {
+      return data.keys().hasAll(['slotKey', 'imageUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['slotKey', 'imageUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.slotKey is string && data.slotKey.size() >= 1 && data.slotKey.size() <= 160 &&
+        data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 850000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsMediaItem(data) {
+      return data.keys().hasAll(['id', 'type', 'title', 'category', 'url', 'embedUrl', 'source', 'placement', 'visible', 'createdAtIso', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'type', 'title', 'category', 'url', 'embedUrl', 'source', 'placement', 'visible', 'createdAtIso', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        (data.type == 'video' || data.type == 'image') &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 240 &&
+        data.category is string && data.category.size() <= 120 &&
+        data.url is string && data.url.size() >= 1 && data.url.size() <= 850000 &&
+        data.embedUrl is string && data.embedUrl.size() <= 1000 &&
+        (data.source == 'youtube' || data.source == 'gdrive' || data.source == 'gallery') &&
+        (data.placement == 'showcase' || data.placement == 'hero' || data.placement == 'team') &&
+        data.visible is bool &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 64 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsTeamMember(data) {
+      return data.keys().hasAll(['id', 'sortOrder', 'name', 'role', 'specialty', 'bio', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'sortOrder', 'name', 'role', 'specialty', 'bio', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.sortOrder is number &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+        data.role is string && data.role.size() <= 200 &&
+        data.specialty is string && data.specialty.size() <= 300 &&
+        data.bio is string && data.bio.size() <= 2500 &&
+        data.image is string && data.image.size() <= 850000 &&
+        data.imageStyle is string && data.imageStyle.size() <= 60 &&
+        data.ctaLabel is string && data.ctaLabel.size() <= 120 &&
+        data.ctaUrl is string && data.ctaUrl.size() <= 1000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsServiceOffering(data) {
+      return data.keys().hasAll(['id', 'number', 'sortOrder', 'title', 'subtitle', 'description', 'deliverables', 'modeLabel', 'whatsappIntent', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'number', 'sortOrder', 'title', 'subtitle', 'description', 'deliverables', 'modeLabel', 'whatsappIntent', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.number is string && data.number.size() <= 16 &&
+        data.sortOrder is number &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 240 &&
+        data.subtitle is string && data.subtitle.size() <= 300 &&
+        data.description is string && data.description.size() <= 3000 &&
+        isValidStringArray(data.deliverables, 30) &&
+        data.modeLabel is string && data.modeLabel.size() <= 120 &&
+        data.whatsappIntent is string && data.whatsappIntent.size() <= 240 &&
+        data.image is string && data.image.size() <= 850000 &&
+        data.imageStyle is string && data.imageStyle.size() <= 60 &&
+        data.ctaLabel is string && data.ctaLabel.size() <= 120 &&
+        data.ctaUrl is string && data.ctaUrl.size() <= 1000 &&
+        data.secondaryCtaLabel is string && data.secondaryCtaLabel.size() <= 120 &&
+        data.secondaryCtaUrl is string && data.secondaryCtaUrl.size() <= 1000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsPricingTier(data) {
+      return data.keys().hasAll(['id', 'sortOrder', 'name', 'tag', 'priceDisplay', 'billingNote', 'summary', 'features', 'featured', 'whatsappService', 'ctaLabel', 'ctaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'sortOrder', 'name', 'tag', 'priceDisplay', 'billingNote', 'summary', 'features', 'featured', 'whatsappService', 'ctaLabel', 'ctaUrl', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.sortOrder is number &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+        data.tag is string && data.tag.size() <= 120 &&
+        data.priceDisplay is string && data.priceDisplay.size() <= 120 &&
+        data.billingNote is string && data.billingNote.size() <= 200 &&
+        data.summary is string && data.summary.size() <= 2000 &&
+        isValidStringArray(data.features, 30) &&
+        data.featured is bool &&
+        data.whatsappService is string && data.whatsappService.size() <= 240 &&
+        data.ctaLabel is string && data.ctaLabel.size() <= 120 &&
+        data.ctaUrl is string && data.ctaUrl.size() <= 1000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsFaqEntry(data) {
+      return data.keys().hasAll(['id', 'sortOrder', 'question', 'answer', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'sortOrder', 'question', 'answer', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.sortOrder is number &&
+        data.question is string && data.question.size() >= 1 && data.question.size() <= 500 &&
+        data.answer is string && data.answer.size() <= 4000 &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidCmsCustomSection(data) {
+      return data.keys().hasAll(['id', 'sortOrder', 'pageId', 'kicker', 'title', 'description', 'bullets', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'tone', 'isPublic', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'sortOrder', 'pageId', 'kicker', 'title', 'description', 'bullets', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'tone', 'isPublic', 'ownerId', 'updatedAt']) &&
+        isValidId(data.id) &&
+        data.sortOrder is number &&
+        (data.pageId in ['home', 'services', 'pricing', 'about', 'team', 'faq', 'contact']) &&
+        data.kicker is string && data.kicker.size() <= 200 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 240 &&
+        data.description is string && data.description.size() <= 4000 &&
+        isValidStringArray(data.bullets, 30) &&
+        data.image is string && data.image.size() <= 850000 &&
+        data.imageStyle is string && data.imageStyle.size() <= 60 &&
+        data.ctaLabel is string && data.ctaLabel.size() <= 120 &&
+        data.ctaUrl is string && data.ctaUrl.size() <= 1000 &&
+        (data.tone == 'white' || data.tone == 'light' || data.tone == 'accent') &&
+        data.isPublic is bool && data.isPublic == true &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    // Collection Rules
+    match /cms_settings/{settingId} {
+      allow get: if isValidId(settingId) && settingId == 'main' && (resource == null || resource.data.isPublic == true);
+      allow create: if isVerifiedAdmin() &&
+        isValidId(settingId) &&
+        settingId == 'main' &&
+        isValidCmsSettings(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(settingId) &&
+        settingId == 'main' &&
+        isValidCmsSettings(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['heroAppearance', 'logoUrl', 'hiddenSections', 'syncedCollections', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /cms_text_entries/{entryId} {
+      allow get: if isValidId(entryId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(entryId) &&
+        isValidCmsTextEntry(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(entryId) &&
+        isValidCmsTextEntry(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['value', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(entryId);
+    }
+
+    match /cms_slot_images/{slotId} {
+      allow get: if isValidId(slotId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(slotId) &&
+        isValidCmsSlotImage(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(slotId) &&
+        isValidCmsSlotImage(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['imageUrl', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(slotId);
+    }
+
+    match /cms_media/{itemId} {
+      allow get: if isValidId(itemId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(itemId) &&
+        isValidCmsMediaItem(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(itemId) &&
+        isValidCmsMediaItem(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'visible', 'placement', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(itemId);
+    }
+
+    match /cms_team/{memberId} {
+      allow get: if isValidId(memberId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(memberId) &&
+        isValidCmsTeamMember(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(memberId) &&
+        isValidCmsTeamMember(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['sortOrder', 'name', 'role', 'specialty', 'bio', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(memberId);
+    }
+
+    match /cms_services/{serviceId} {
+      allow get: if isValidId(serviceId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(serviceId) &&
+        isValidCmsServiceOffering(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(serviceId) &&
+        isValidCmsServiceOffering(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['number', 'sortOrder', 'title', 'subtitle', 'description', 'deliverables', 'modeLabel', 'whatsappIntent', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(serviceId);
+    }
+
+    match /cms_pricing/{tierId} {
+      allow get: if isValidId(tierId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(tierId) &&
+        isValidCmsPricingTier(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(tierId) &&
+        isValidCmsPricingTier(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['sortOrder', 'name', 'tag', 'priceDisplay', 'billingNote', 'summary', 'features', 'featured', 'whatsappService', 'ctaLabel', 'ctaUrl', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(tierId);
+    }
+
+    match /cms_faqs/{faqId} {
+      allow get: if isValidId(faqId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(faqId) &&
+        isValidCmsFaqEntry(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(faqId) &&
+        isValidCmsFaqEntry(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['sortOrder', 'question', 'answer', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(faqId);
+    }
+
+    match /cms_custom_sections/{sectionId} {
+      allow get: if isValidId(sectionId) && (resource == null || resource.data.isPublic == true);
+      allow list: if resource.data.isPublic == true;
+      allow create: if isVerifiedAdmin() &&
+        isValidId(sectionId) &&
+        isValidCmsCustomSection(incoming()) &&
+        incoming().ownerId == request.auth.uid;
+      allow update: if isVerifiedAdmin() &&
+        isValidId(sectionId) &&
+        isValidCmsCustomSection(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['sortOrder', 'pageId', 'kicker', 'title', 'description', 'bullets', 'image', 'imageStyle', 'ctaLabel', 'ctaUrl', 'tone', 'updatedAt']);
+      allow delete: if isVerifiedAdmin() && isValidId(sectionId);
+    }
+
+    match /test/{docId} {
+      allow get: if isValidId(docId) && docId == 'connection';
+    }
+  }
+}
