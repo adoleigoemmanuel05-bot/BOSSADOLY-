@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { BUILT_IN_SECTIONS } from '../data/siteData';
 import type {
+  CmsContent,
   CustomSection,
   FaqEntry,
   PageId,
@@ -20,6 +21,7 @@ import type {
 } from '../types/content';
 import { IMAGE_SLOT_STYLE_OPTIONS } from '../utils/imageStyles';
 import { readAndCompressFile } from '../utils/imageCompression';
+import { adminApiRequest } from '../utils/adminApi';
 import { markPendingCloudSync } from '../App';
 import {
   isCloudAdminSignedIn,
@@ -42,6 +44,7 @@ export type SectionEditorFocus =
   | 'builtin';
 
 interface AdminSectionsManagerProps {
+  cms: CmsContent;
   token: string;
   teamMembers: TeamMember[];
   services: ServiceOffering[];
@@ -66,6 +69,7 @@ const PAGE_LABELS: { value: Exclude<PageId, 'admin'>; label: string }[] = [
 ];
 
 export function AdminSectionsManager({
+  cms,
   token,
   teamMembers,
   services,
@@ -157,10 +161,11 @@ export function AdminSectionsManager({
       }
     }
     if (hasAny) {
-      await fetch('/api/admin/site-text', {
+      await adminApiRequest('/api/admin/site-text', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
-        body: JSON.stringify({ updates }),
+        token,
+        body: { updates },
+        currentCms: cms,
       });
       if (isCloudAdminSignedIn()) {
         await syncTextUpdatesToCloud(updates);
@@ -172,10 +177,11 @@ export function AdminSectionsManager({
 
   const clearLegacyImageOverride = async (slotKey: string) => {
     if (siteImages[slotKey] !== undefined) {
-      await fetch('/api/admin/replace-image', {
+      await adminApiRequest('/api/admin/replace-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
-        body: JSON.stringify({ slotKey, reset: true }),
+        token,
+        body: { slotKey, reset: true },
+        currentCms: cms,
       });
       if (isCloudAdminSignedIn()) {
         await syncSlotImageToCloud(slotKey, null);
@@ -193,15 +199,13 @@ export function AdminSectionsManager({
     setBusy(true);
     setStatusMsg(null);
     try {
-      const res = await fetch(endpoint, {
+      const res = await adminApiRequest<{ error?: string }>(endpoint, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify(payload),
+        token,
+        body: payload,
+        currentCms: cms,
       });
-      const data = (await res.json()) as { error?: string };
+      const data = res.data;
       if (!res.ok) {
         setStatusMsg({ type: 'err', text: data.error || 'Failed to save changes.' });
         return false;

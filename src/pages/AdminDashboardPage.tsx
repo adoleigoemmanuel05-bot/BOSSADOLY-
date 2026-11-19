@@ -59,6 +59,7 @@ import {
 } from '../utils/imageStyles';
 import { readAndCompressFile } from '../utils/imageCompression';
 import { isCmsEdited, loadLocalCmsSnapshot } from '../utils/localSnapshot';
+import { adminApiRequest, CLOUD_PW_HASH_KEY } from '../utils/adminApi';
 import {
   markPendingCloudSync,
   SAVED_HERO_APPEARANCE_KEY,
@@ -571,12 +572,15 @@ export function AdminDashboardPage({
     setAuthError('');
     setAuthLoading(true);
     try {
-      const res = await fetch('/api/admin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const data = (await res.json()) as { ok?: boolean; token?: string; error?: string };
+      const res = await adminApiRequest<{ ok?: boolean; token?: string; error?: string }>(
+        '/api/admin/verify',
+        {
+          method: 'POST',
+          body: { password },
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok || !data.token) {
         setAuthError(data.error || 'Incorrect password.');
         return;
@@ -584,58 +588,61 @@ export function AdminDashboardPage({
       setToken(data.token);
       setPassword('');
 
-      // If the server storage reset across container restarts, restore full snapshot from Firestore/IndexedDB
-      try {
-        const checkRes = await fetch('/api/content', {
-          headers: { 'x-admin-token': data.token },
-        });
-        if (checkRes.ok) {
-          const checkData = (await checkRes.json()) as CmsContent;
-          const serverHasEdits = isCmsEdited(checkData, DEFAULT_COUNTS);
-          if (!serverHasEdits) {
-            const localSnap = await loadLocalCmsSnapshot();
-            const source = isCmsEdited(cms, DEFAULT_COUNTS)
-              ? cms
-              : localSnap && isCmsEdited(localSnap.content, DEFAULT_COUNTS)
-              ? localSnap.content
-              : null;
+      // If running with an Express backend whose container reset to defaults, restore from cloud/IndexedDB
+      if (res.mode === 'server') {
+        try {
+          const checkRes = await fetch('/api/content', {
+            headers: { 'x-admin-token': data.token },
+          });
+          const checkType = checkRes.headers.get('content-type') || '';
+          if (checkRes.ok && checkType.includes('application/json')) {
+            const checkData = (await checkRes.json()) as CmsContent;
+            const serverHasEdits = isCmsEdited(checkData, DEFAULT_COUNTS);
+            if (!serverHasEdits) {
+              const localSnap = await loadLocalCmsSnapshot();
+              const source = isCmsEdited(cms, DEFAULT_COUNTS)
+                ? cms
+                : localSnap && isCmsEdited(localSnap.content, DEFAULT_COUNTS)
+                ? localSnap.content
+                : null;
 
-            if (source) {
-              await fetch('/api/admin/restore-snapshot', {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-admin-token': data.token,
-                },
-                body: JSON.stringify(source),
-              });
-            } else {
-              const savedLogo = localStorage.getItem(SAVED_LOGO_KEY);
-              if (savedLogo && savedLogo.startsWith('data:image/')) {
-                await fetch('/api/admin/upload-image', {
-                  method: 'POST',
+              if (source) {
+                await fetch('/api/admin/restore-snapshot', {
+                  method: 'PUT',
                   headers: {
                     'Content-Type': 'application/json',
                     'x-admin-token': data.token,
                   },
-                  body: JSON.stringify({
-                    dataUrl: savedLogo,
-                    title: 'Company Logo',
-                    category: 'Brand',
-                    placement: 'logo',
-                  }),
+                  body: JSON.stringify(source),
                 });
+              } else {
+                const savedLogo = localStorage.getItem(SAVED_LOGO_KEY);
+                if (savedLogo && savedLogo.startsWith('data:image/')) {
+                  await fetch('/api/admin/upload-image', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-admin-token': data.token,
+                    },
+                    body: JSON.stringify({
+                      dataUrl: savedLogo,
+                      title: 'Company Logo',
+                      category: 'Brand',
+                      placement: 'logo',
+                    }),
+                  });
+                }
               }
             }
           }
+        } catch {
+          // Ignore non-critical sync error
         }
-      } catch {
-        // Ignore non-critical sync error
       }
 
       await onRefreshContent(data.token);
     } catch {
-      setAuthError('Unable to reach server. Please try again.');
+      setAuthError('Unable to verify password. Please try again.');
     } finally {
       setAuthLoading(false);
     }
@@ -653,20 +660,18 @@ export function AdminDashboardPage({
     setVideoSubmitting(true);
 
     try {
-      const res = await fetch('/api/admin/video', {
+      const res = await adminApiRequest<{ item?: MediaItem; error?: string }>('/api/admin/video', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           title: videoTitle,
           category: videoCategory,
           url: videoUrl,
           placement: 'showcase',
-        }),
+        },
+        currentCms: cms,
       });
-      const data = (await res.json()) as { item?: MediaItem; error?: string };
+      const data = res.data;
       if (!res.ok) {
         setVideoStatus({ type: 'err', text: data.error || 'Failed to add video.' });
         return;
@@ -698,20 +703,21 @@ export function AdminDashboardPage({
 
     try {
       const dataUrl = await readAndCompressFile(file);
-      const res = await fetch('/api/admin/upload-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({
-          dataUrl,
-          title: imageTitle.trim() || file.name.replace(/\.[^/.]+$/, ''),
-          category: imageCategory,
-          placement: imagePlacement,
-        }),
-      });
-      const data = (await res.json()) as { item?: MediaItem; error?: string };
+      const res = await adminApiRequest<{ item?: MediaItem; error?: string }>(
+        '/api/admin/upload-image',
+        {
+          method: 'POST',
+          token,
+          body: {
+            dataUrl,
+            title: imageTitle.trim() || file.name.replace(/\.[^/.]+$/, ''),
+            category: imageCategory,
+            placement: imagePlacement,
+          },
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok) {
         setImageStatus({ type: 'err', text: data.error || 'Failed to upload image.' });
         return;
@@ -742,20 +748,21 @@ export function AdminDashboardPage({
 
     try {
       const dataUrl = await readAndCompressFile(file);
-      const res = await fetch('/api/admin/upload-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({
-          dataUrl,
-          title: 'Company Logo',
-          category: 'Brand',
-          placement: 'logo',
-        }),
-      });
-      const data = (await res.json()) as { logoUrl?: string; error?: string };
+      const res = await adminApiRequest<{ logoUrl?: string; error?: string }>(
+        '/api/admin/upload-image',
+        {
+          method: 'POST',
+          token,
+          body: {
+            dataUrl,
+            title: 'Company Logo',
+            category: 'Brand',
+            placement: 'logo',
+          },
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok) {
         setLogoStatus({ type: 'err', text: data.error || 'Logo upload failed.' });
         return;
@@ -788,9 +795,10 @@ export function AdminDashboardPage({
     } catch {
       // Ignore storage errors
     }
-    await fetch('/api/admin/logo', {
+    await adminApiRequest('/api/admin/logo', {
       method: 'DELETE',
-      headers: { 'x-admin-token': token },
+      token,
+      currentCms: cms,
     });
     if (isCloudAdminSignedIn()) {
       await syncSettingsToCloud({ logoUrl: null });
@@ -808,15 +816,16 @@ export function AdminDashboardPage({
     setHeroSaving(true);
     setHeroStatus(null);
     try {
-      const res = await fetch('/api/admin/hero-appearance', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { heroAppearance?: HeroAppearance; error?: string };
+      const res = await adminApiRequest<{ heroAppearance?: HeroAppearance; error?: string }>(
+        '/api/admin/hero-appearance',
+        {
+          method: 'PUT',
+          token,
+          body: payload as unknown as Record<string, unknown>,
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok || !data.heroAppearance) {
         setHeroStatus({ type: 'err', text: data.error || 'Failed to save background settings.' });
         return;
@@ -844,23 +853,18 @@ export function AdminDashboardPage({
 
   const handleToggleVisibility = async (item: MediaItem) => {
     if (!token) return;
-    const res = await fetch(`/api/admin/item/${item.id}`, {
+    const res = await adminApiRequest<{ item?: MediaItem }>(`/api/admin/item/${item.id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token': token,
-      },
-      body: JSON.stringify({ visible: !item.visible }),
+      token,
+      body: { visible: !item.visible },
+      currentCms: cms,
     });
-    if (res.ok) {
-      const data = (await res.json()) as { item?: MediaItem };
-      if (data.item) {
-        if (isCloudAdminSignedIn()) {
-          await upsertMediaItemToCloud(data.item);
-          markPendingCloudSync(false);
-        } else {
-          markPendingCloudSync(true);
-        }
+    if (res.ok && res.data.item) {
+      if (isCloudAdminSignedIn()) {
+        await upsertMediaItemToCloud(res.data.item);
+        markPendingCloudSync(false);
+      } else {
+        markPendingCloudSync(true);
       }
     }
     await onRefreshContent(token);
@@ -868,9 +872,10 @@ export function AdminDashboardPage({
 
   const handleDeleteItem = async (id: string) => {
     if (!token) return;
-    const res = await fetch(`/api/admin/item/${id}`, {
+    const res = await adminApiRequest(`/api/admin/item/${id}`, {
       method: 'DELETE',
-      headers: { 'x-admin-token': token },
+      token,
+      currentCms: cms,
     });
     if (res.ok) {
       if (isCloudAdminSignedIn()) {
@@ -906,17 +911,14 @@ export function AdminDashboardPage({
     }
 
     try {
-      const res = await fetch('/api/admin/site-text', {
+      const res = await adminApiRequest<{ error?: string }>('/api/admin/site-text', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ updates }),
+        token,
+        body: { updates },
+        currentCms: cms,
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setTextStatus({ type: 'err', text: data.error || 'Failed to save changes.' });
+        setTextStatus({ type: 'err', text: res.data.error || 'Failed to save changes.' });
         return;
       }
       if (isCloudAdminSignedIn()) {
@@ -946,13 +948,11 @@ export function AdminDashboardPage({
       return next;
     });
     const updates = { [fieldKey]: null, [colorKey]: null };
-    await fetch('/api/admin/site-text', {
+    await adminApiRequest('/api/admin/site-text', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token': token,
-      },
-      body: JSON.stringify({ updates }),
+      token,
+      body: { updates },
+      currentCms: cms,
     });
     if (isCloudAdminSignedIn()) {
       await syncTextUpdatesToCloud(updates);
@@ -970,17 +970,14 @@ export function AdminDashboardPage({
     const cleanedVal = value && value.trim() ? value.trim() : null;
     const updates = { [key]: cleanedVal };
     try {
-      const res = await fetch('/api/admin/site-text', {
+      const res = await adminApiRequest<{ error?: string }>('/api/admin/site-text', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ updates }),
+        token,
+        body: { updates },
+        currentCms: cms,
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setSlotStatus({ type: 'err', text: data.error || 'Failed to save image style.' });
+        setSlotStatus({ type: 'err', text: res.data.error || 'Failed to save image style.' });
         return;
       }
       if (isCloudAdminSignedIn()) {
@@ -1006,15 +1003,16 @@ export function AdminDashboardPage({
     setSlotStatus(null);
     try {
       const dataUrl = await readAndCompressFile(file);
-      const res = await fetch('/api/admin/replace-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ slotKey, dataUrl }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
+      const res = await adminApiRequest<{ url?: string; error?: string }>(
+        '/api/admin/replace-image',
+        {
+          method: 'POST',
+          token,
+          body: { slotKey, dataUrl },
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok) {
         setSlotStatus({ type: 'err', text: data.error || 'Failed to replace image.' });
         return;
@@ -1041,15 +1039,16 @@ export function AdminDashboardPage({
     setSlotBusy(slotKey);
     setSlotStatus(null);
     try {
-      const res = await fetch('/api/admin/replace-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ slotKey, imageUrl: url }),
-      });
-      const data = (await res.json()) as { url?: string; error?: string };
+      const res = await adminApiRequest<{ url?: string; error?: string }>(
+        '/api/admin/replace-image',
+        {
+          method: 'POST',
+          token,
+          body: { slotKey, imageUrl: url },
+          currentCms: cms,
+        }
+      );
+      const data = res.data;
       if (!res.ok) {
         setSlotStatus({ type: 'err', text: data.error || 'Failed to update image URL.' });
         return;
@@ -1075,13 +1074,11 @@ export function AdminDashboardPage({
     setSlotBusy(slotKey);
     setSlotStatus(null);
     try {
-      await fetch('/api/admin/replace-image', {
+      await adminApiRequest('/api/admin/replace-image', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ slotKey, reset: true }),
+        token,
+        body: { slotKey, reset: true },
+        currentCms: cms,
       });
       if (isCloudAdminSignedIn()) {
         await syncSlotImageToCloud(slotKey, null);
@@ -1112,21 +1109,32 @@ export function AdminDashboardPage({
 
     setPwSaving(true);
     try {
-      const res = await fetch('/api/admin/change-password', {
+      const res = await adminApiRequest<{
+        ok?: boolean;
+        token?: string;
+        pwHash?: string;
+        error?: string;
+      }>('/api/admin/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           currentPassword,
           newPassword: newPassword.trim(),
-        }),
+        },
+        currentCms: cms,
       });
-      const data = (await res.json()) as { ok?: boolean; token?: string; error?: string };
+      const data = res.data;
       if (!res.ok || !data.token) {
         setPwStatus({ type: 'err', text: data.error || 'Unable to update password.' });
         return;
+      }
+      if (data.pwHash) {
+        if (isCloudAdminSignedIn()) {
+          await syncTextUpdatesToCloud({ [CLOUD_PW_HASH_KEY]: data.pwHash });
+          markPendingCloudSync(false);
+        } else {
+          markPendingCloudSync(true);
+        }
       }
       setToken(data.token);
       setCurrentPassword('');
@@ -1136,8 +1144,9 @@ export function AdminDashboardPage({
         type: 'ok',
         text: 'Admin password updated! Use your new password next time you log into #ADMIN.',
       });
+      await onRefreshContent(data.token);
     } catch {
-      setPwStatus({ type: 'err', text: 'Network error while updating password.' });
+      setPwStatus({ type: 'err', text: 'Unable to update password right now.' });
     } finally {
       setPwSaving(false);
     }
@@ -1404,6 +1413,7 @@ export function AdminDashboardPage({
         {/* TAB 0: ADD / DELETE SECTIONS, TEAM, SERVICES, PRICING & FAQ */}
         {activeTab === 'sections' && (
           <AdminSectionsManager
+            cms={cms}
             token={token}
             teamMembers={teamMembers}
             services={services}
@@ -1420,6 +1430,7 @@ export function AdminDashboardPage({
         {/* TAB: EDIT CTA BUTTONS & DESTINATIONS */}
         {activeTab === 'cta' && (
           <AdminCtaManager
+            cms={cms}
             token={token}
             siteText={siteText}
             services={services}

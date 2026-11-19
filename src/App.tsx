@@ -141,30 +141,34 @@ export default function App() {
 
   const fetchContent = useCallback(async (adminToken?: string) => {
     let serverContent: CmsContent | null = null;
-    try {
-      const headers: Record<string, string> = {};
-      if (adminToken) {
-        headers['x-admin-token'] = adminToken;
+    const isStaticSession = Boolean(adminToken && adminToken.startsWith('static_'));
+    if (!isStaticSession) {
+      try {
+        const headers: Record<string, string> = {};
+        if (adminToken) {
+          headers['x-admin-token'] = adminToken;
+        }
+        const res = await fetch('/api/content', { headers });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = (await res.json()) as Partial<CmsContent>;
+          serverContent = {
+            logoUrl: data.logoUrl ?? null,
+            items: Array.isArray(data.items) ? data.items : [],
+            siteText: data.siteText ?? {},
+            siteImages: data.siteImages ?? {},
+            heroAppearance: data.heroAppearance || DEFAULT_HERO_APPEARANCE,
+            teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : TEAM_DATA,
+            services: Array.isArray(data.services) ? data.services : SERVICES_DATA,
+            pricingTiers: Array.isArray(data.pricingTiers) ? data.pricingTiers : PRICING_TIERS,
+            faqs: Array.isArray(data.faqs) ? data.faqs : FAQ_DATA,
+            customSections: Array.isArray(data.customSections) ? data.customSections : [],
+            hiddenSections: Array.isArray(data.hiddenSections) ? data.hiddenSections : [],
+          };
+        }
+      } catch {
+        // Server may be offline or hosted statically (e.g. Netlify)
       }
-      const res = await fetch('/api/content', { headers });
-      if (res.ok) {
-        const data = (await res.json()) as Partial<CmsContent>;
-        serverContent = {
-          logoUrl: data.logoUrl ?? null,
-          items: Array.isArray(data.items) ? data.items : [],
-          siteText: data.siteText ?? {},
-          siteImages: data.siteImages ?? {},
-          heroAppearance: data.heroAppearance || DEFAULT_HERO_APPEARANCE,
-          teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : TEAM_DATA,
-          services: Array.isArray(data.services) ? data.services : SERVICES_DATA,
-          pricingTiers: Array.isArray(data.pricingTiers) ? data.pricingTiers : PRICING_TIERS,
-          faqs: Array.isArray(data.faqs) ? data.faqs : FAQ_DATA,
-          customSections: Array.isArray(data.customSections) ? data.customSections : [],
-          hiddenSections: Array.isArray(data.hiddenSections) ? data.hiddenSections : [],
-        };
-      }
-    } catch {
-      // Server may be offline or restarting
     }
 
     let cloudResult: Awaited<ReturnType<typeof loadCmsFromCloud>> = { hasCloudData: false };
@@ -199,16 +203,10 @@ export default function App() {
           cloudResult.logoUrl !== undefined
             ? cloudResult.logoUrl
             : resolved.logoUrl || readLocalLogo(),
-        items:
-          cloudResult.items && cloudResult.items.length > 0 ? visibleItems : resolved.items,
-        siteText:
-          cloudResult.siteText && Object.keys(cloudResult.siteText).length > 0
-            ? cloudResult.siteText
-            : resolved.siteText,
+        items: cloudResult.items !== undefined ? visibleItems : resolved.items,
+        siteText: cloudResult.siteText !== undefined ? cloudResult.siteText : resolved.siteText,
         siteImages:
-          cloudResult.siteImages && Object.keys(cloudResult.siteImages).length > 0
-            ? cloudResult.siteImages
-            : resolved.siteImages,
+          cloudResult.siteImages !== undefined ? cloudResult.siteImages : resolved.siteImages,
         heroAppearance: cloudResult.heroAppearance || resolved.heroAppearance,
         teamMembers: cloudResult.teamMembers ?? resolved.teamMembers,
         services: cloudResult.services ?? resolved.services,

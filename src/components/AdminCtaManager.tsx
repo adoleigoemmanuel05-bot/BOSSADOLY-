@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Check, ExternalLink, MousePointerClick, RotateCcw } from 'lucide-react';
 import type {
+  CmsContent,
   CustomSection,
   PricingTier,
   ServiceOffering,
   TeamMember,
 } from '../types/content';
 import { WHATSAPP_DISPLAY } from '../utils/whatsapp';
+import { adminApiRequest } from '../utils/adminApi';
 import { markPendingCloudSync } from '../App';
 import {
   isCloudAdminSignedIn,
@@ -16,6 +18,7 @@ import {
 } from '../services/cmsCloud';
 
 interface AdminCtaManagerProps {
+  cms: CmsContent;
   token: string;
   siteText: Record<string, string>;
   services: ServiceOffering[];
@@ -55,6 +58,7 @@ const INTERNAL_PAGE_OPTIONS = [
 ];
 
 export function AdminCtaManager({
+  cms,
   token,
   siteText,
   services,
@@ -323,18 +327,15 @@ export function AdminCtaManager({
     }
 
     try {
-      const res = await fetch('/api/admin/site-text', {
+      const res = await adminApiRequest<{ error?: string }>('/api/admin/site-text', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-token': token,
-        },
-        body: JSON.stringify({ updates }),
+        token,
+        body: { updates },
+        currentCms: cms,
       });
 
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setStatus({ type: 'err', text: data.error || 'Failed to save button changes.' });
+        setStatus({ type: 'err', text: res.data.error || 'Failed to save button changes.' });
         return;
       }
 
@@ -349,13 +350,11 @@ export function AdminCtaManager({
             ctaUrl: d.ctaUrl.trim(),
           };
         });
-        await fetch('/api/admin/custom-sections', {
+        await adminApiRequest('/api/admin/custom-sections', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-token': token,
-          },
-          body: JSON.stringify({ customSections: updatedCustom }),
+          token,
+          body: { customSections: updatedCustom },
+          currentCms: cms,
         });
       }
 
@@ -393,13 +392,11 @@ export function AdminCtaManager({
       return next;
     });
 
-    await fetch('/api/admin/site-text', {
+    await adminApiRequest('/api/admin/site-text', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-token': token,
-      },
-      body: JSON.stringify({ updates }),
+      token,
+      body: { updates },
+      currentCms: cms,
     });
     if (isCloudAdminSignedIn()) {
       await syncTextUpdatesToCloud(updates);
